@@ -49,6 +49,9 @@ void unimplemented(int);
  * return.  Process the request appropriately.
  * Parameters: client: the socket connected to the client */
 /**********************************************************************/
+// http请求的组成：一个请求行，后面跟随零个或多个请求报头，再跟随一个空的文本行来终止报头列表。
+// 请求行 ： method URI version
+//
 void accept_request(int client)  // client是已连接描述符
 {
 	char buf[1024];
@@ -100,6 +103,7 @@ void accept_request(int client)  // client是已连接描述符
 		query_string = url;
 		while ((*query_string != '?') && (*query_string != '\0'))
 			query_string++;
+		// 直接将url切断，'?'前为url，'?'后为query_string
 		if (*query_string == '?')
 		{
 			cgi = 1;
@@ -108,6 +112,7 @@ void accept_request(int client)  // client是已连接描述符
 		}
 	}
 
+	// path为资源文件
 	sprintf(path, "htdocs%s", url);
 	if (path[strlen(path) - 1] == '/')
 		strcat(path, "index.html");
@@ -121,15 +126,16 @@ void accept_request(int client)  // client是已连接描述符
 	}
 	else  // 成功
 	{
- 		if ((st.st_mode & S_IFMT) == S_IFDIR)
+ 		if ((st.st_mode & S_IFMT) == S_IFDIR)  // S_IFMT表示文件类型
+ 			// path是一个目录
 			strcat(path, "/index.html");
-		if ((st.st_mode & S_IXUSR) ||
-				(st.st_mode & S_IXGRP) ||
-				(st.st_mode & S_IXOTH))
+		if ((st.st_mode & S_IXUSR) ||  // 拥有者有x权限
+				(st.st_mode & S_IXGRP) || // 组成员有x权限
+				(st.st_mode & S_IXOTH))  // others有x权限
 			cgi = 1;
-		if (!cgi)
+		if (!cgi)   // 直接返回path给client
 			serve_file(client, path);
-		else
+		else  // 执行cgi
 			execute_cgi(client, path, method, query_string);
 	}
 
@@ -479,6 +485,7 @@ int startup(u_short *port)
  * implemented.
  * Parameter: the client socket */
 /**********************************************************************/
+// 501
 void unimplemented(int client)
 {
 	char buf[1024];
