@@ -63,6 +63,8 @@ void accept_request(int client)  // client是已连接描述符
 	char *query_string = NULL;
 
 	numchars = get_line(client, buf, sizeof(buf));
+
+	// 读取method信息
 	i = 0; j = 0;
 	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
 	{
@@ -81,6 +83,7 @@ void accept_request(int client)  // client是已连接描述符
 	if (strcasecmp(method, "POST") == 0)
 		cgi = 1;
 
+	// 再读取url信息
 	i = 0;
 	while (ISspace(buf[j]) && (j < sizeof(buf)))
 		j++;
@@ -91,6 +94,7 @@ void accept_request(int client)  // client是已连接描述符
 	}
 	url[i] = '\0';
 
+	// method为GET时，从url中读取查询字符串，如果有查询字符串，则为cgi
 	if (strcasecmp(method, "GET") == 0)
 	{
 		query_string = url;
@@ -107,12 +111,15 @@ void accept_request(int client)  // client是已连接描述符
 	sprintf(path, "htdocs%s", url);
 	if (path[strlen(path) - 1] == '/')
 		strcat(path, "index.html");
-	if (stat(path, &st) == -1) {
+
+	// 将path对应的文件状态，复制到st的内存
+	if (stat(path, &st) == -1) {  // 失败
+		// 读掉headers
 		while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
 			numchars = get_line(client, buf, sizeof(buf));
 		not_found(client);
 	}
-	else
+	else  // 成功
 	{
  		if ((st.st_mode & S_IFMT) == S_IFDIR)
 			strcat(path, "/index.html");
@@ -195,7 +202,7 @@ void cannot_execute(int client)
 /**********************************************************************/
 void error_die(const char *sc)
 {
-	perror(sc);
+	perror(sc);  // 输出"sc: error_msg"到stderr
 	exit(1);
 }
 
@@ -219,6 +226,8 @@ void execute_cgi(int client, const char *path,
 	int content_length = -1;
 
 	buf[0] = 'A'; buf[1] = '\0';
+
+	// 
 	if (strcasecmp(method, "GET") == 0)
  		while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
 			numchars = get_line(client, buf, sizeof(buf));
@@ -250,6 +259,7 @@ void execute_cgi(int client, const char *path,
 		return;
 	}
 
+	// fork一个子进程来运行cgi
 	if ( (pid = fork()) < 0 ) {
 		cannot_execute(client);
 		return;
@@ -308,12 +318,14 @@ void execute_cgi(int client, const char *path,
  *             the size of the buffer
  * Returns: the number of bytes stored (excluding null) */
 /**********************************************************************/
+// 读取一行，剩余的部分依然留在了内核缓冲区中
 int get_line(int sock, char *buf, int size)
 {
 	int i = 0;
 	char c = '\0';
 	int n;
 
+	// '\n'或者'\r\n'或者'\r'结尾，都会跳出循环
 	while ((i < size - 1) && (c != '\n'))
 	{
 		n = recv(sock, &c, 1, 0);
@@ -322,11 +334,12 @@ int get_line(int sock, char *buf, int size)
 		{
 			if (c == '\r')  // carriage return
 			{
-				n = recv(sock, &c, 1, MSG_PEEK);  // 再读一个字符出来
+				// 再读一个字符出来，但是它依然还在内核缓冲区中（MSG_PEEK）
+				n = recv(sock, &c, 1, MSG_PEEK);  
 				/* DEBUG printf("%02X\n", c); */
-				if ((n > 0) && (c == '\n'))  // CRLF
-					recv(sock, &c, 1, 0);
-				else
+				if ((n > 0) && (c == '\n'))  // 以CRLF结尾
+					recv(sock, &c, 1, 0);  // 把'\n'读到c中
+				else  // 以carriage return结尾
 					c = '\n';
 			}
 			buf[i] = c;
@@ -335,7 +348,7 @@ int get_line(int sock, char *buf, int size)
 		else
 			c = '\n';  
 	}
-	buf[i] = '\0';  // 给buf封一个尾
+	buf[i] = '\0';  // 给buf末尾封一个null字符
 	return(i);
 }
 
@@ -362,6 +375,7 @@ void headers(int client, const char *filename)
 /**********************************************************************/
 /* Give a client a 404 not found status message. */
 /**********************************************************************/
+// 构建一个404响应给client
 void not_found(int client)
 {
 	char buf[1024];
@@ -399,7 +413,7 @@ void serve_file(int client, const char *filename)
 	int numchars = 1;
 	char buf[1024];
 
-	buf[0] = 'A'; buf[1] = '\0';
+	buf[0] = 'A'; buf[1] = '\0';   // 为了第一次通过while
 	while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
 		numchars = get_line(client, buf, sizeof(buf));
 
@@ -408,8 +422,8 @@ void serve_file(int client, const char *filename)
 		not_found(client);
 	else
 	{
-		headers(client, filename);
-		cat(client, resource);
+		headers(client, filename);   // 构造一个响应头给client
+		cat(client, resource);  // 发送文件内容给client
 	}
 	fclose(resource);
 }
