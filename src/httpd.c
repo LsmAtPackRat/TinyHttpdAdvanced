@@ -49,6 +49,7 @@ void unimplemented(int);
  * return.  Process the request appropriately.
  * Parameters: client: the socket connected to the client */
 /**********************************************************************/
+// 线程函数体
 // http请求的组成：一个请求行，后面跟随零个或多个请求报头，再跟随一个空的文本行来终止报头列表。
 // 请求行 ： method URI version
 //
@@ -103,7 +104,7 @@ void accept_request(int client)  // client是已连接描述符
 		query_string = url;
 		while ((*query_string != '?') && (*query_string != '\0'))
 			query_string++;
-		// 直接将url切断，'?'前为url，'?'后为query_string
+		// 直接将url一切为二，'?'前为url，'?'后为query_string
 		if (*query_string == '?')
 		{
 			cgi = 1;
